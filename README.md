@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
-## Getting Started
+<div align="center">
+   <div style="display: flex;">
+   <img src="./public/logo.svg" />
+   <h1>Sched</h1>
+   </div>
+   A simple web application that allows users to authenticate via Google SSO and create/schedule Google Meet meetings.
+</div>
 
-First, run the development server:
+## Demo
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/9144362c-91d4-4878-8878-263b69337223" />
+</div>
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+## Features
 
-To learn more about Next.js, take a look at the following resources:
+- Google SSO authentication using NextAuth.js
+- Instant meeting creation with Google Meet links
+- Scheduled meeting creation with future date/time
+- Clean and intuitive user interface
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Prerequisites
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Bun v1.2.9
+- Google Cloud Platform account
+- Google OAuth 2.0 credentials
 
-## Deploy on Vercel
+## Setup
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/r3yc0n1c/sched.git
+   cd sched
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. Install dependencies:
+   ```bash
+   bun install
+   ```
+
+3. Create a `.env.local` file in the root directory with the following variables:
+   ```
+   NEXTAUTH_URL=http://localhost:3000
+   NEXTAUTH_SECRET=your-secret-key-here
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
+   GOOGLE_CLIENT_AUTH_URI=your-google-client-auth-uri
+   GOOGLE_CLIENT_TOKEN_URI=your-google-client-token-uri
+   GOOGLE_CLIENT_PROJECT_ID=your-google-client-project-id
+   GOOGLE_CLIENT_REDIRECT_URIS=your-google-client-redirect-uris
+   GOOGLE_CLIENT_JAVASCRIPT_ORIGINS=your-google-client-js-origins-uris
+   ```
+
+4. Set up Google OAuth credentials:
+   - Go to the [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Enable the Google+ API
+   - Create OAuth 2.0 credentials
+   - Add authorized redirect URIs:
+     - `http://localhost:3000/api/auth/callback/google`
+     - `http://localhost:3000` (for development)
+   - Copy the Client ID and Client Secret to your `.env.local` file
+
+5. Run the development server:
+   ```bash
+   bun run dev
+   ```
+
+6. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+
+## License
+
+MIT
