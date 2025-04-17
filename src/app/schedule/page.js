@@ -110,6 +110,7 @@ export default function SchedulePage() {
       const name = formData.get("name");
       const date = formData.get("date");
       const time = formData.get("time");
+      const email = formData.get("email");
       
       const meetLink = generateUniqueMeetLink();
       const scheduledDate = new Date(`${date}T${time}`);
@@ -133,6 +134,27 @@ export default function SchedulePage() {
 
       const data = await response.json();
 
+      // Send email invitation
+      if (email) {
+        const emailResponse = await fetch('/api/email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name,
+            link: meetLink,
+            date,
+            time,
+            email,
+          }),
+        });
+
+        if (!emailResponse.ok) {
+          throw new Error('Failed to send email invitation');
+        }
+      }
+
       // Store in Redux
       dispatch(setScheduledMeeting({
         name,
@@ -145,6 +167,7 @@ export default function SchedulePage() {
       toast.success(
         <div className="flex flex-col gap-2">
           <span>Meeting scheduled successfully!</span>
+          {email && <span className="text-sm text-muted-foreground">Email invitation sent to {email}</span>}
           <a
             href={data.calendarUrl}
             target="_blank"
@@ -361,6 +384,15 @@ export default function SchedulePage() {
                       !selectedDate ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                     placeholder={!selectedDate ? "Select a date first" : "Select time"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground">Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="Enter email for invitation"
+                    className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                 </div>
                 <Button type="submit" className="w-full">
