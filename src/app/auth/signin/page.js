@@ -14,7 +14,7 @@ export default function SignIn() {
         <CardContent>
           <Button
             onClick={() => signIn("google", { callbackUrl: "/" })}
-            className="w-full"
+            className="w-full cursor-pointer"
           >
             Sign in with Google
           </Button>
