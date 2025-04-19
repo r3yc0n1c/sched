@@ -49,11 +49,11 @@ export async function POST(req) {
         description: `Let's talk`,
         start: {
           dateTime: startDateTime.toISOString(),
-          timeZone: 'Asia/Kolkata',
+          timeZone: 'UTC',
         },
         end: {
           dateTime: endDateTime.toISOString(),
-          timeZone: 'Asia/Kolkata',
+          timeZone: 'UTC',
         },
         conferenceData: {
           createRequest: {

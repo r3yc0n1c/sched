@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LogIn } from "lucide-react";
-
+import { Spinner } from "@/components/ui/spinner";
 export default function Home() {
   const { data: session, status } = useSession();
   const router = useRouter();

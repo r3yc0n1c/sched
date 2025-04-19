@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function SchedulePage() {
   const { data: session, status } = useSession();
@@ -36,10 +37,12 @@ export default function SchedulePage() {
   const [selectedDate, setSelectedDate] = useState('');
   const [copiedLink, setCopiedLink] = useState(null);
   const [duration, setDuration] = useState("30"); // Default to 30 minutes
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [isSchedulingInstant, setIsSchedulingInstant] = useState(false);
 
   // Get today's date in YYYY-MM-DD format for the date input min attribute
   const today = new Date().toISOString().split('T')[0];
-  
+
   // Get current time in HH:mm format for the time input min attribute
   const currentTime = new Date().toTimeString().slice(0, 5);
 
@@ -59,26 +62,14 @@ export default function SchedulePage() {
     console.log('Navigate to profile page');
   };
 
-  const handleInstantMeeting = () => {
-    try {
-      const meetLink = generateUniqueMeetLink();
-      const now = new Date();
-      dispatch(setInstantMeeting({
-        link: meetLink,
-        createdAt: now.toISOString(),
-      }));
-    } catch (error) {
-      console.error('Error generating meeting link:', error);
-      // You might want to show an error message to the user here
-    }
-  };
-
   const handleDateChange = (e) => {
     setSelectedDate(e.target.value);
   };
 
   const handleScheduleMeeting = async (e) => {
     e.preventDefault();
+    setIsScheduling(true);
+
     const formData = new FormData(e.target);
     const meetingName = formData.get("meetingName");
     const date = formData.get("date");
@@ -119,12 +110,15 @@ export default function SchedulePage() {
           </div>
         );
         e.target.reset();
+        setDuration("30");
       } else {
         toast.error(data.error || "Failed to schedule meeting");
       }
     } catch (error) {
       console.error("Error scheduling meeting:", error);
       toast.error("Failed to schedule meeting");
+    } finally {
+      setIsScheduling(false);
     }
   };
 
@@ -199,6 +193,48 @@ export default function SchedulePage() {
 
   const firstName = session.user?.name?.split(' ')[0] || 'User';
 
+  const handleInstantMeeting = async (e) => {
+    e.preventDefault();
+    setIsSchedulingInstant(true);
+
+    const meetingName = `Coffee chat with ${firstName}`;
+    const dateTime = new Date();
+    const date = dateTime.toISOString().split('T')[0];
+    const startTime = dateTime.toTimeString().slice(0, 5);
+
+    try {
+      const response = await fetch("/api/calendar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          meetingName,
+          date,
+          startTime,
+          duration: 15,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        dispatch(setInstantMeeting({
+          ...data.meeting,
+          createdAt: dateTime.toISOString()
+        }));
+        toast.success("Instant meeting scheduled successfully!");
+      } else {
+        toast.error(data.error || "Failed to schedule meeting");
+      }
+    } catch (error) {
+      console.error("Error scheduling meeting:", error);
+      toast.error("Failed to schedule meeting");
+    } finally {
+      setIsSchedulingInstant(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background lg:py-6 py-12 px-4 lg:px-8">
       <div className="max-w-3xl mx-auto">
@@ -249,8 +285,20 @@ export default function SchedulePage() {
               <CardTitle>Instant Meeting</CardTitle>
             </CardHeader>
             <CardContent>
-              <Button onClick={handleInstantMeeting} className="w-full">
-                Create Instant Meeting
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isSchedulingInstant}
+                onClick={handleInstantMeeting}
+              >
+                {isSchedulingInstant ? (
+                  <div className="flex items-center gap-2">
+                    <Spinner size="small" className="text-white" />
+                    <span>Hang tight! Setting up...</span>
+                  </div>
+                ) : (
+                  "Create Instant Meeting"
+                )}
               </Button>
               {instantMeeting && (
                 <div className="mt-4 p-4 bg-muted rounded-md">
@@ -259,20 +307,20 @@ export default function SchedulePage() {
                   </p>
                   <div className="flex items-center gap-2 mt-2">
                     <a
-                      href={instantMeeting.link}
+                      href={instantMeeting.meetLink}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline break-all"
                     >
-                      {instantMeeting.link}
+                      {instantMeeting.meetLink}
                     </a>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => copyToClipboard(instantMeeting.link)}
+                      onClick={() => copyToClipboard(instantMeeting.meetLink)}
                       className="h-8 w-8 cursor-pointer"
                     >
-                      {copiedLink === instantMeeting.link ? (
+                      {copiedLink === instantMeeting.meetLink ? (
                         <Check className="h-4 w-4 text-green-500" />
                       ) : (
                         <Copy className="h-4 w-4" />
@@ -319,9 +367,8 @@ export default function SchedulePage() {
                     required
                     disabled={!selectedDate}
                     min={selectedDate === today ? currentTime : undefined}
-                    className={`mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      !selectedDate ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
+                    className={`mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${!selectedDate ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     placeholder={!selectedDate ? "Select a date first" : "Select time"}
                   />
                 </div>
@@ -352,8 +399,19 @@ export default function SchedulePage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button type="submit" className="w-full">
-                  Schedule Meeting
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isScheduling}
+                >
+                  {isScheduling ? (
+                    <div className="flex items-center gap-2">
+                      <Spinner size="small" className="text-white" />
+                      <span>Hang tight! Setting up...</span>
+                    </div>
+                  ) : (
+                    "Schedule Meeting"
+                  )}
                 </Button>
               </form>
 
@@ -370,7 +428,7 @@ export default function SchedulePage() {
                       </button>
                       <h4 className="font-medium text-foreground">{meeting.meetingName}</h4>
                       <p className="text-sm text-muted-foreground">
-                        {format(new Date(meeting.date), "MMM d, yyyy 'at' h:mm a")}
+                        {format(new Date(meeting.date+'T'+meeting.startTime+':00'), "MMM d, yyyy 'at' h:mm a")}
                       </p>
                       <div className="flex items-center gap-2 mt-2">
                         <a
