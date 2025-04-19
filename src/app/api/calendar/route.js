@@ -15,13 +15,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Access token not available' }, { status: 401 });
     }
 
-    const { meetingName, date, startTime, email, duration } = await req.json();
-
-    // Format date and time for Google Calendar
-    const [year, month, day] = date.split('-');
-    const [hours, minutes] = startTime.split(':');
-    const startDateTime = new Date(year, month - 1, day, hours, minutes);
-    const endDateTime = new Date(startDateTime.getTime() + duration * 60 * 1000); // duration in minutes
+    const { meetingName, startDateTime, endDateTime, email, userTimeZone } = await req.json();
 
     // Initialize OAuth2Client
     const oauth2Client = new google.auth.OAuth2(
@@ -48,12 +42,12 @@ export async function POST(req) {
         summary: meetingName,
         description: `Let's talk`,
         start: {
-          dateTime: startDateTime.toISOString(),
-          timeZone: 'UTC',
+          dateTime: startDateTime,
+          timeZone: userTimeZone,
         },
         end: {
-          dateTime: endDateTime.toISOString(),
-          timeZone: 'UTC',
+          dateTime: endDateTime,
+          timeZone: userTimeZone,
         },
         conferenceData: {
           createRequest: {
@@ -70,9 +64,9 @@ export async function POST(req) {
       success: true,
       meeting: {
         meetingName,
-        date,
-        startTime,
-        duration,
+        date: new Date(startDateTime).toISOString().split('T')[0],
+        startTime: new Date(startDateTime).toTimeString().slice(0, 5),
+        duration: Math.round((new Date(endDateTime) - new Date(startDateTime)) / (60 * 1000)),
         email,
         meetLink: response.data.hangoutLink,
         calendarEventId: response.data.id,

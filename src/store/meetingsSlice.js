@@ -20,7 +20,7 @@ export const meetingsSlice = createSlice({
     },
     clearScheduledMeeting: (state, action) => {
       state.scheduledMeetings = state.scheduledMeetings.filter(
-        meeting => meeting.link !== action.payload
+        meeting => meeting.meetLink !== action.payload
       );
     },
   },

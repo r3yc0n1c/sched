@@ -75,6 +75,13 @@ export default function SchedulePage() {
     const date = formData.get("date");
     const startTime = formData.get("time");
     const email = formData.get("email");
+    const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // Calculate start and end times in ISO format
+    const [year, month, day] = date.split('-');
+    const [hours, minutes] = startTime.split(':');
+    const startDateTime = new Date(year, month - 1, day, hours, minutes);
+    const endDateTime = new Date(startDateTime.getTime() + parseInt(duration) * 60 * 1000);
 
     try {
       const response = await fetch("/api/calendar", {
@@ -84,10 +91,10 @@ export default function SchedulePage() {
         },
         body: JSON.stringify({
           meetingName,
-          date,
-          startTime,
+          startDateTime: startDateTime.toISOString(),
+          endDateTime: endDateTime.toISOString(),
           email,
-          duration: parseInt(duration),
+          userTimeZone,
         }),
       });
 
@@ -198,9 +205,9 @@ export default function SchedulePage() {
     setIsSchedulingInstant(true);
 
     const meetingName = `Coffee chat with ${firstName}`;
-    const dateTime = new Date();
-    const date = dateTime.toISOString().split('T')[0];
-    const startTime = dateTime.toTimeString().slice(0, 5);
+    const startDateTime = new Date();
+    const endDateTime = new Date(startDateTime.getTime() + 15 * 60 * 1000); // 15 minutes
+    const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     try {
       const response = await fetch("/api/calendar", {
@@ -210,9 +217,9 @@ export default function SchedulePage() {
         },
         body: JSON.stringify({
           meetingName,
-          date,
-          startTime,
-          duration: 15,
+          startDateTime: startDateTime.toISOString(),
+          endDateTime: endDateTime.toISOString(),
+          userTimeZone,
         }),
       });
 
@@ -221,7 +228,7 @@ export default function SchedulePage() {
       if (data.success) {
         dispatch(setInstantMeeting({
           ...data.meeting,
-          createdAt: dateTime.toISOString()
+          createdAt: startDateTime.toISOString()
         }));
         toast.success("Instant meeting scheduled successfully!");
       } else {
