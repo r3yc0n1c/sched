@@ -129,8 +129,30 @@ export default function SchedulePage() {
     }
   };
 
-  const handleDeleteMeeting = (meetLink) => {
-    dispatch(clearScheduledMeeting(meetLink));
+  const handleDeleteMeeting = async (meeting) => {
+    try {
+      const response = await fetch("/api/calendar", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          calendarEventId: meeting.calendarEventId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        dispatch(clearScheduledMeeting(meeting.meetLink));
+        toast.success("Meeting deleted successfully!");
+      } else {
+        toast.error(data.error || "Failed to delete meeting");
+      }
+    } catch (error) {
+      console.error("Error deleting meeting:", error);
+      toast.error("Failed to delete meeting");
+    }
   };
 
   const copyToClipboard = async (text) => {
@@ -428,14 +450,14 @@ export default function SchedulePage() {
                   {scheduledMeetings.map((meeting) => (
                     <div key={meeting.meetLink} className="p-4 bg-muted rounded-md relative group">
                       <button
-                        onClick={() => handleDeleteMeeting(meeting.meetLink)}
+                        onClick={() => handleDeleteMeeting(meeting)}
                         className="absolute top-2 right-2 p-1 rounded-full hover:bg-background transition-colors"
                       >
                         <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                       </button>
                       <h4 className="font-medium text-foreground">{meeting.meetingName}</h4>
                       <p className="text-sm text-muted-foreground">
-                        {format(new Date(meeting.date+'T'+meeting.startTime+':00'), "MMM d, yyyy 'at' h:mm a")}
+                        {format(new Date(meeting.startDateTime), "MMM d, yyyy 'at' h:mm a")}
                       </p>
                       <div className="flex items-center gap-2 mt-2">
                         <a

@@ -64,9 +64,8 @@ export async function POST(req) {
       success: true,
       meeting: {
         meetingName,
-        date: new Date(startDateTime).toISOString().split('T')[0],
-        startTime: new Date(startDateTime).toTimeString().slice(0, 5),
-        duration: Math.round((new Date(endDateTime) - new Date(startDateTime)) / (60 * 1000)),
+        startDateTime,
+        endDateTime,
         email,
         meetLink: response.data.hangoutLink,
         calendarEventId: response.data.id,
@@ -77,6 +76,54 @@ export async function POST(req) {
     console.error('Error creating calendar event:', error);
     return NextResponse.json(
       { error: 'Failed to create calendar event' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!session.accessToken) {
+      return NextResponse.json({ error: 'Access token not available' }, { status: 401 });
+    }
+
+    const { calendarEventId } = await req.json();
+
+    // Initialize OAuth2Client
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+
+    // Set credentials
+    oauth2Client.setCredentials({
+      access_token: session.accessToken,
+      refresh_token: session.refreshToken,
+      token_type: 'Bearer',
+      scope: 'https://www.googleapis.com/auth/calendar'
+    });
+
+    // Create calendar instance
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    await calendar.events.delete({
+      calendarId: 'primary',
+      eventId: calendarEventId,
+      sendUpdates: 'all',
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting calendar event:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete calendar event' },
       { status: 500 }
     );
   }
