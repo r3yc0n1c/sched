@@ -1,34 +1,88 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { google } from 'googleapis';
 
-export async function POST(request) {
+export async function POST(req) {
   try {
-    const meetingDetails = await request.json();
-    const startDate = new Date(meetingDetails.date);
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour duration
+    const session = await getServerSession(authOptions);
 
-    // Format dates for Google Calendar URL
-    const formatDate = (date) => {
-      return date.toISOString().replace(/-|:|\.\d+/g, '');
-    };
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    // Create Google Calendar event URL
-    const calendarUrl = new URL('https://calendar.google.com/calendar/render');
-    calendarUrl.searchParams.append('action', 'TEMPLATE');
-    calendarUrl.searchParams.append('text', meetingDetails.name);
-    calendarUrl.searchParams.append('details', `Google Meet Link: ${meetingDetails.link}`);
-    calendarUrl.searchParams.append('dates', `${formatDate(startDate)}/${formatDate(endDate)}`);
-    calendarUrl.searchParams.append('add', 'Google Meet');
-    calendarUrl.searchParams.append('location', meetingDetails.link);
-    
+    if (!session.accessToken) {
+      return NextResponse.json({ error: 'Access token not available' }, { status: 401 });
+    }
+
+    const { meetingName, date, startTime, email, duration } = await req.json();
+
+    // Format date and time for Google Calendar
+    const [year, month, day] = date.split('-');
+    const [hours, minutes] = startTime.split(':');
+    const startDateTime = new Date(year, month - 1, day, hours, minutes);
+    const endDateTime = new Date(startDateTime.getTime() + duration * 60 * 1000); // duration in minutes
+
+    // Initialize OAuth2Client
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+
+    // Set credentials
+    oauth2Client.setCredentials({
+      access_token: session.accessToken,
+      refresh_token: session.refreshToken,
+      token_type: 'Bearer',
+      scope: 'https://www.googleapis.com/auth/calendar'
+    });
+
+    // Create calendar instance
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      conferenceDataVersion: 1,
+      requestBody: {
+        summary: meetingName,
+        description: `Let's talk`,
+        start: {
+          dateTime: startDateTime.toISOString(),
+          timeZone: 'Asia/Kolkata',
+        },
+        end: {
+          dateTime: endDateTime.toISOString(),
+          timeZone: 'Asia/Kolkata',
+        },
+        conferenceData: {
+          createRequest: {
+            requestId: Math.random().toString(36).substring(7),
+            conferenceSolutionKey: { type: 'hangoutsMeet' },
+          },
+        },
+        attendees: email ? [{ email }] : [],
+      },
+      sendUpdates: 'all',
+    });
+
     return NextResponse.json({
       success: true,
-      meeting: meetingDetails,
-      calendarUrl: calendarUrl.toString()
+      meeting: {
+        meetingName,
+        date,
+        startTime,
+        duration,
+        email,
+        meetLink: response.data.hangoutLink,
+        calendarEventId: response.data.id,
+        calendarEventLink: response.data.htmlLink,
+      },
     });
   } catch (error) {
-    console.error('Error processing meeting:', error);
+    console.error('Error creating calendar event:', error);
     return NextResponse.json(
-      { error: 'Failed to process meeting' },
+      { error: 'Failed to create calendar event' },
       { status: 500 }
     );
   }

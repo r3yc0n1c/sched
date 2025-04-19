@@ -20,6 +20,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Trash2, User, Copy, Check, Calendar } from "lucide-react";
 import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function SchedulePage() {
   const { data: session, status } = useSession();
@@ -27,8 +34,8 @@ export default function SchedulePage() {
   const dispatch = useDispatch();
   const { instantMeeting, scheduledMeetings } = useSelector((state) => state.meetings);
   const [selectedDate, setSelectedDate] = useState('');
-  const [usedCodes, setUsedCodes] = useState(new Set());
   const [copiedLink, setCopiedLink] = useState(null);
+  const [duration, setDuration] = useState("30"); // Default to 30 minutes
 
   // Get today's date in YYYY-MM-DD format for the date input min attribute
   const today = new Date().toISOString().split('T')[0];
@@ -52,39 +59,6 @@ export default function SchedulePage() {
     console.log('Navigate to profile page');
   };
 
-  const generateUniqueMeetLink = () => {
-    const maxAttempts = 5;
-    let attempts = 0;
-    
-    while (attempts < maxAttempts) {
-      const newCode = generateMeetCode();
-      if (!usedCodes.has(newCode)) {
-        setUsedCodes(prev => new Set([...prev, newCode]));
-        return `https://meet.google.com/${newCode}`;
-      }
-      attempts++;
-    }
-    
-    // If we couldn't generate a unique code after max attempts
-    throw new Error('Unable to generate a unique meeting code. Please try again.');
-  };
-
-  const generateMeetCode = () => {
-    // Function to generate random letters
-    const getRandomLetter = () => {
-      const alphabet = 'abcdefghijklmnopqrstuvwxyz';
-      return alphabet.charAt(Math.floor(Math.random() * alphabet.length));
-    };
-
-    // Generate three groups of random letters
-    const group1 = Array(3).fill(0).map(getRandomLetter).join(''); // 3 letters
-    const group2 = Array(4).fill(0).map(getRandomLetter).join(''); // 4 letters
-    const group3 = Array(3).fill(0).map(getRandomLetter).join(''); // 3 letters
-    
-    // Combine groups with hyphens
-    return `${group1}-${group2}-${group3}`;
-  };
-
   const handleInstantMeeting = () => {
     try {
       const meetLink = generateUniqueMeetLink();
@@ -105,87 +79,52 @@ export default function SchedulePage() {
 
   const handleScheduleMeeting = async (e) => {
     e.preventDefault();
+    const formData = new FormData(e.target);
+    const meetingName = formData.get("meetingName");
+    const date = formData.get("date");
+    const startTime = formData.get("time");
+    const email = formData.get("email");
+
     try {
-      const formData = new FormData(e.target);
-      const name = formData.get("name");
-      const date = formData.get("date");
-      const time = formData.get("time");
-      const email = formData.get("email");
-      
-      const meetLink = generateUniqueMeetLink();
-      const scheduledDate = new Date(`${date}T${time}`);
-      
-      // Create calendar event through API
-      const response = await fetch('/api/calendar', {
-        method: 'POST',
+      const response = await fetch("/api/calendar", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name,
-          link: meetLink,
-          date: scheduledDate.toISOString(),
+          meetingName,
+          date,
+          startTime,
+          email,
+          duration: parseInt(duration),
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create calendar event');
-      }
-
       const data = await response.json();
 
-      // Send email invitation
-      if (email) {
-        const emailResponse = await fetch('/api/email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name,
-            link: meetLink,
-            date,
-            time,
-            email,
-          }),
-        });
-
-        if (!emailResponse.ok) {
-          throw new Error('Failed to send email invitation');
-        }
+      if (data.success) {
+        dispatch(setScheduledMeeting(data.meeting));
+        toast.success(
+          <div className="flex flex-col gap-2">
+            <span>Meeting scheduled successfully!</span>
+            <a
+              href={data.meeting.calendarEventLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline flex items-center gap-2"
+            >
+              <Calendar className="h-4 w-4" />
+              Check in Google Calendar
+            </a>
+          </div>
+        );
+        e.target.reset();
+      } else {
+        toast.error(data.error || "Failed to schedule meeting");
       }
-
-      // Store in Redux
-      dispatch(setScheduledMeeting({
-        name,
-        link: meetLink,
-        date: scheduledDate.toISOString(),
-        calendarUrl: data.calendarUrl
-      }));
-
-      // Show success message with calendar link
-      toast.success(
-        <div className="flex flex-col gap-2">
-          <span>Meeting scheduled successfully!</span>
-          {email && <span className="text-sm text-muted-foreground">Email invitation sent to {email}</span>}
-          <a
-            href={data.calendarUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline flex items-center gap-2"
-          >
-            <Calendar className="h-4 w-4" />
-            Add to Google Calendar
-          </a>
-        </div>
-      );
-
-      // Reset the form
-      e.target.reset();
-      setSelectedDate('');
     } catch (error) {
-      console.error('Error scheduling meeting:', error);
-      toast.error('Failed to schedule meeting. Please try again.');
+      console.error("Error scheduling meeting:", error);
+      toast.error("Failed to schedule meeting");
     }
   };
 
@@ -355,7 +294,7 @@ export default function SchedulePage() {
                   <label className="block text-sm font-medium text-foreground">Meeting Name</label>
                   <input
                     type="text"
-                    name="name"
+                    name="meetingName"
                     required
                     placeholder="Enter meeting name"
                     className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -395,6 +334,24 @@ export default function SchedulePage() {
                     className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                 </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Meeting Duration
+                  </label>
+                  <Select
+                    value={duration}
+                    onValueChange={setDuration}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="15">15 minutes</SelectItem>
+                      <SelectItem value="30">30 minutes</SelectItem>
+                      <SelectItem value="60">1 hour</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button type="submit" className="w-full">
                   Schedule Meeting
                 </Button>
@@ -404,33 +361,33 @@ export default function SchedulePage() {
                 <div className="mt-6 space-y-4">
                   <h3 className="text-sm font-medium text-foreground">Scheduled Meetings</h3>
                   {scheduledMeetings.map((meeting) => (
-                    <div key={meeting.link} className="p-4 bg-muted rounded-md relative group">
+                    <div key={meeting.meetLink} className="p-4 bg-muted rounded-md relative group">
                       <button
-                        onClick={() => handleDeleteMeeting(meeting.link)}
+                        onClick={() => handleDeleteMeeting(meeting.meetLink)}
                         className="absolute top-2 right-2 p-1 rounded-full hover:bg-background transition-colors"
                       >
                         <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                       </button>
-                      <h4 className="font-medium text-foreground">{meeting.name}</h4>
+                      <h4 className="font-medium text-foreground">{meeting.meetingName}</h4>
                       <p className="text-sm text-muted-foreground">
                         {format(new Date(meeting.date), "MMM d, yyyy 'at' h:mm a")}
                       </p>
                       <div className="flex items-center gap-2 mt-2">
                         <a
-                          href={meeting.link}
+                          href={meeting.meetLink}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary hover:underline break-all"
                         >
-                          {meeting.link}
+                          {meeting.meetLink}
                         </a>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => copyToClipboard(meeting.link)}
+                          onClick={() => copyToClipboard(meeting.meetLink)}
                           className="h-8 w-8"
                         >
-                          {copiedLink === meeting.link ? (
+                          {copiedLink === meeting.meetLink ? (
                             <Check className="h-4 w-4 text-green-500" />
                           ) : (
                             <Copy className="h-4 w-4" />
